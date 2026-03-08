@@ -16,75 +16,109 @@ date: "March 2026"
 | Cohort Analysis | 31,589 rows | Monthly views for 6+ months post-publish |
 | Cross-Platform | 26,030 rows | Content mapping across platforms |
 
-**Analysis pipeline:**
-1. EDA → identify structural patterns in CPM, retention, and platform differences
-2. Revenue proxy modeling → `views × CPM / 1000` to estimate monetization
-3. Cohort-based lifecycle analysis → classify evergreen vs viral-decay content
-4. Cross-platform matched comparison → control for selection bias
-5. ML-based evergreen predictor → multi-feature Gradient Boosting (AUC = 0.93)
+**Revenue model:** `views × CPM / 1000` — platforms pay per 1,000 ad impressions. CPM varies 35× between formats (Shorts: $0.06, Production: $1.94 on YouTube) because longer videos support mid-roll ads.
 
-**Tools:** Python, pandas, scipy, scikit-learn, matplotlib/seaborn
-
-> **Note on platform focus:** Snapchat dominates total revenue (91.7%) through high volume × moderate CPM. However, YouTube and Facebook are where content strategy decisions are made: format optimization, evergreen lifecycle management, and cross-platform synergy. Snapchat revenue follows content strategy, not the other way around.
+**Platform focus:** Snapchat drives 91.7% of total revenue through volume. But content strategy decisions (format, duration, cross-posting timing) are made based on YouTube and Facebook data. Snapchat revenue follows content strategy.
 
 ---
 
-# Insight 1: The Short-Form Monetization Trap
+# Insight 1: Shorts Are More Efficient Than They Look
 
-## "Your best-performing format is your worst-earning one"
+## The standard view: Shorts pay 35× less per view. But that misses production cost.
 
-| Metric | YouTube Shorts | YouTube Production | Gap |
-|--------|---------------|-------------------|-----|
-| **CPM** | $0.06 | $1.94 | **35×** |
-| **Revenue/video** | $1.27 | $9.68 | **7.6×** |
-| Retention (avg % viewed) | 105% | 20% | — |
-| Share of content | 74.4% | 20.6% | — |
-| Share of YT revenue | 31% | 66% | **inverted** |
+| Format | Total Revenue | Content Hours | Revenue per Hour of Content |
+|--------|:------------:|:-------------:|:---------------------------:|
+| Shorts | $6,603 | 39 hours | **$167/hr** |
+| Production | $13,967 | 718 hours | **$19/hr** |
 
-**The trap:** Shorts dominate engagement dashboards but generate only 31% of YouTube revenue despite being 74% of content. Production videos >8 min unlock mid-roll ads → **35× CPM jump**.
+Using content duration as a cost proxy, **Shorts generate 8.6× more revenue per unit of content produced.** A 30-minute Production video earns 7.6× more per video — but takes 66× longer to create.
 
-**Recommendation:** Reallocate 10% of Shorts capacity → Production (>8 min).
-Conservative (3:1 effort ratio): **+$1,019 net revenue** (+15% of Shorts revenue).
+At realistic production cost ratios (3-5× for Production vs Shorts), Production still wins on absolute ROI. But the breakeven is at 7.6× — above that, Shorts are more profitable. Actual production costs would refine this analysis.
+
+## Which Shorts perform best?
+
+Three clear patterns emerge:
+
+**Duration:** Longer Shorts earn more. 45-60 second Shorts earn $2.39 avg vs $0.67 for the most common 15-30s format (3.6× more).
+
+| Duration | Share | Mean Revenue | Mean Views |
+|:--------:|:-----:|:------------:|:----------:|
+| 0-15s | 24% | $1.22 | 34,815 |
+| 15-30s | 48% | $0.67 | 22,786 |
+| 30-45s | 18% | $1.72 | 64,114 |
+| 45-60s | 8% | **$2.39** | **86,660** |
+| 60-120s | 1% | $2.20 | 193,806 |
+
+**Day of week:** Sunday Shorts earn +159% more ($2.66 vs $1.03).
+
+**Channel concentration:** 10 channels produce 43% of Shorts and earn 82% of Shorts revenue. One channel (channel_9119) averages $23.51 per Short vs $1.27 overall.
+
+## Production video sweet spot: 8-15 minutes
+
+Videos at 8-10 minutes are **12.4× more efficient** than average — they unlock mid-roll ads while keeping attention. Only 0.7% of content but 8.2% of YouTube revenue. 10-15 minutes: 2.0% of content, 20.5% of revenue (10.5× efficiency).
+
+**Recommendation:** Shift Shorts mix toward 45-60s, increase Sunday publishing, scale top channel practices. For Production, target 8-15 minute formats — the most underutilized high-ROI segment.
 
 ---
 
 # Insight 2: Evergreen Content = Compound Returns
 
-## 8.5% of videos generate 54.5% of tracked revenue
+## 10.8% of videos generate 44.3% of tracked revenue — and keep growing
 
-| Metric | Evergreen (8.5%) | Normal (91.5%) |
-|--------|-----------------|----------------|
-| **Lifetime revenue/video** | **$48.59** | $3.69 |
-| Revenue after month 0 | 85.3% | 24.9% |
-| Median duration | 13 min | 51 sec |
+| Metric | Evergreen (10.8%) | Normal (89.2%) |
+|--------|:-----------------:|:--------------:|
+| Mean revenue | $10.56 | $1.61 |
+| Revenue share | 44.3% | 55.7% |
+| Views after month 0 | 84% | 6% |
 
-**Key insight:** Most content "dies" in month 1 (median retention: 0.2% of month 0). Evergreen videos keep generating revenue for 6+ months — **85% of their value comes after the first month**.
+84% of evergreen views arrive AFTER the first month. This is compound returns in content — revenue keeps flowing for 6+ months.
 
-**ML-powered early detection:** Multi-feature Gradient Boosting model (8 features, AUC = 0.93) identifies evergreen content within 7 days. Top predictors: watch time concentration in first 7 days (44.8%) and view share in first 7 days (25.7%). The model catches **99% of evergreen videos** with near-zero false positives.
+## Content lifecycle clusters (K-Means, k=3)
 
-**Business impact of false negatives:** Each missed evergreen video = ~$48.59 in unrealized promotion value.
+| Cluster | Share | Revenue Share | Views After M0 | Profile |
+|---------|:-----:|:------------:|:--------------:|---------|
+| Spike & Die | 79.2% | 41.5% | 2.8% | Peak in week 1, then silence |
+| Moderate Decay | 12.4% | 25.2% | 36.3% | Gradual decline over 2-3 months |
+| Evergreen | 8.5% | 33.3% | 91.4% | Steady views for 6+ months |
 
-**Recommendation:** Deploy 7-day ML predictor to auto-flag evergreen candidates. Introduce "Evergreen Score" KPI (m3/m0 retention). Target: 8.5% → 15% evergreen share (+$4,400 lifetime value).
+## ML predictor: flagging evergreen content on day 7
+
+Gradient Boosting (8 features available at day 7). **AUC = 0.87 (5-fold cross-validation).**
+
+| Threshold | Precision | Recall | Videos Flagged |
+|:---------:|:---------:|:------:|:--------------:|
+| 0.1 | 50% | 69% | 837 |
+| 0.2 | 61% | 63% | 615 |
+| 0.3 | 67% | 59% | 535 |
+| 0.5 | 75% | 54% | 431 |
+
+Top feature: share of views in first 7 days (66.6% importance). If a video keeps accumulating views past day 7 instead of front-loading — it's likely evergreen.
+
+**Practical application:** Video published 7 days ago → model scores probability 0.7 → flag as evergreen candidate → invest in promotion.
+
+**What's needed next:** promotion spend data, organic vs paid traffic split, A/B test (promote flagged vs control, 4 weeks).
+
+**Proposed KPI:** Evergreen Score = month 3 views / month 0 views. Target: grow evergreen share from 8.5% to 15%.
 
 ---
 
-# Insight 3: Cross-Platform Synergy
+# Insight 3: Cross-Platform Publishing Doubles Views
 
-## Multi-platform publishing amplifies — not cannibalizes — performance
+## 96% of content is single-platform. The 4% that's cross-posted gets dramatically more views.
 
 | Platform | Single-platform | Multi-platform | Lift | p-value |
-|----------|----------------|----------------|------|---------|
-| **Facebook** | 11,764 views | 16,048 views | **+36%** | 0.0001 |
-| **Snapchat** | 42,789 views | 56,177 views | **+31%** | 0.001 |
-| YouTube | 2,297 views | 2,215 views | −4% | 0.86 (n.s.) |
+|----------|:--------------:|:--------------:|:----:|:-------:|
+| Facebook | 63,736 views | 127,373 views | **+100%** | < 0.0001 |
+| Snapchat | 927,574 views | 2,172,797 views | **+134%** | < 0.0001 |
+| YouTube | 12,131 views | 5,395 views | -56% | 0.18 (n.s.) |
 
-**96% of content** is published on just 1 platform — only 4% is cross-posted.
+This isn't cannibalization — Facebook and Snapchat audiences barely overlap. Publishing on a second platform adds new viewers.
 
-**Robust to selection bias check:** Same-channel comparison confirms the effect. Mann-Whitney U tests significant at p < 0.01 for Facebook and Snapchat.
+YouTube shows no effect — likely because YouTube's algorithm independently determines distribution, and cross-platform traffic doesn't influence ranking.
 
-**Watch time lift:** +58% on Facebook, +52% on Snapchat — deep engagement, not just clicks.
+**Best combination:** Facebook + Snapchat ($2,671 combined revenue per content piece, 238 examples). Mean delay between first and second publication: 87 days.
 
-**Recommendation:** Scale cross-posting from 4% → 20%. Priority: Facebook ↔ Snapchat. Conservative estimate: **+40M additional views**. Start with 4%→10% pilot to validate.
+**Recommendation:** Scale cross-posting from 4% to 20%. Start with 4%→10% pilot on Facebook↔Snapchat. Measure view and revenue uplift, then run A/B test for causal confirmation (correlation ≠ causation).
 
 ---
 
@@ -92,68 +126,85 @@ Conservative (3:1 effort ratio): **+$1,019 net revenue** (+15% of Shorts revenue
 
 ## The metric most teams optimize is negatively correlated with revenue
 
-| Metric | Correlation with Revenue | Signal |
-|--------|------------------------|--------|
-| **Watch time** | r ≈ +0.65 | ✅ Best engagement proxy |
-| Total views | r ≈ +0.62 | ✅ Strong |
-| Likes | r ≈ +0.37 | ⚠️ Weak positive |
-| Shares | r ≈ +0.33 | ⚠️ Positive (drives distribution) |
-| Engagement rate | r ≈ −0.24 | ❌ Anti-correlated |
-| Avg % viewed | r ≈ −0.42 | ❌ Anti-correlated |
+**Spearman correlations with revenue (all platforms):**
 
-**Only 13.4%** of top-engagement videos are also top-revenue — worse than the 25% random baseline.
+| Metric | Correlation | Signal |
+|--------|:----------:|--------|
+| Watch time | +0.65 | Best revenue predictor |
+| Total views | +0.62 | Strong |
+| Likes | +0.45 | Moderate |
+| Shares | +0.41 | Moderate (drives distribution) |
+| Comments | +0.29 | Weak |
+| Engagement rate | **-0.24** | Negative |
+| Avg % viewed | **-0.39** | Negative |
 
-**Why?** Engagement rate is dominated by Shorts (105% retention, near-zero revenue). Optimizing for engagement steers the content mix toward Shorts — exactly the wrong direction for revenue.
+Only 13.4% of top-engagement videos are also top-revenue — worse than the 25% random baseline.
 
-**Recommendation:** Replace engagement rate with **watch time** as primary KPI. Track share rate as secondary signal (shares → distribution → revenue).
+## Why this happens (Simpson's paradox)
+
+1. Shorts have highest engagement: 105% retention (viewers rewatch), engagement rate 1.41
+2. Shorts have near-zero CPM: $0.06, mean revenue $1.27
+3. Production videos: low engagement (20% retention), but 35× higher CPM ($1.94)
+
+Mixing formats → high engagement signals "probably a Short" → low revenue.
+
+**Within a single format, the paradox disappears.** Among Production videos, engagement positively correlates with revenue (ρ = +0.16).
+
+**Recommendation:** Replace engagement rate with watch time as primary KPI. Don't compare engagement across Shorts and Production — they're different universes. Among engagement sub-metrics, track shares (drives distribution and revenue).
+
+---
+
+# Revenue Concentration Risk
+
+46.4% of Snapchat revenue comes from one channel (channel_621). Gini coefficient = 0.73.
+
+| Channel | Revenue | Share | Videos |
+|---------|--------:|:-----:|:------:|
+| channel_621 | $131K | 46.4% | 94 |
+| channel_761 | $31K | 10.9% | 43 |
+| channel_1367 | $22K | 7.6% | 44 |
+| channel_438 | $13K | 4.4% | 46 |
+| channel_190 | $9K | 3.2% | 41 |
+| Other 27 | $78K | 27.5% | — |
+
+**Recommendation:** Monitor channel_621 health, extract best practices from top 5, long-term target: no channel > 25% of platform revenue.
+
+---
+
+# Action Plan
+
+**This Week:**
+1. Replace engagement rate with watch time in dashboards
+2. Deploy 7-day ML scoring for evergreen content detection
+3. Start tracking cross-posting rate as operational metric (current: 4%)
+
+**1-3 Months:**
+4. Shift Shorts mix toward 45-60s format, increase Sunday publishing
+5. Scale Facebook↔Snapchat cross-posting to 10%, measure impact
+6. Introduce Evergreen Score KPI
+
+**3-6 Months:**
+7. A/B test ML-driven promotion (flagged vs control)
+8. Reduce Snapchat revenue concentration (target: max 25% per channel)
+9. Test SMM hypothesis: manual publishing vs automated across 250+ channels
 
 ---
 
 # What's Next
 
-## SMM Hypothesis: Human vs. Automated Publishing
+## SMM Hypothesis: Human vs Automated Publishing
+250+ channels, key question: does manual SMM meaningfully outperform automated posting?
+Test via propensity score matching + 4-week A/B test. If >15% CPM lift → keep SMM teams. If <5% → automate.
 
-**The question:** Does human SMM (custom thumbnails, titles, descriptions) meaningfully outperform automated posting?
+## From One-Time Analysis to Production Pipeline
+Automated system: ML scoring on day 7 → Slack alerts → anomaly detection → weekly reports.
+MVP: 2 weeks. Full system: 2-3 months.
 
-**Approach:** Propensity score matching + A/B test across comparable content batches (4 weeks). If human SMM adds >15% CPM lift → ROI on SMM headcount is clear. If <5% → automation frees significant resources across 250+ channels.
-
-## Automation Vision
-
-This analysis → **production pipeline:**
-
-`Data Ingestion → ML Scoring → Anomaly Detection → Weekly Reports → Slack Alerts`
-
-- **Day 7 auto-scoring:** ML model flags evergreen candidates → Slack alert to promote
-- **AI agents:** LLM-powered weekly analysis → natural-language insights for content teams
-- **MVP timeline:** 2 weeks (ingestion + alerts). Full system: 2-3 months.
-
-## Further Research
-- **Causal inference** for cross-platform effect (A/B test / instrumental variables)
-- **Revenue-per-minute-of-effort** with production cost data
-- **NLP on titles/thumbnails** to enhance evergreen prediction
-- **Audience overlap** between platforms
-- **Seasonal CPM trends** — is the Shorts gap narrowing?
-
----
-
-# Technical Appendix
-
-## Revenue Landscape
-
-| Segment | Revenue Share | Content Share |
-|---------|:------------:|:-------------:|
-| Snapchat Stories | 91.7% | 13.0% |
-| YouTube Production | 4.5% | 12.5% |
-| YouTube Shorts | 2.1% | 45.3% |
-| Facebook Production | 1.5% | 26.1% |
-| YouTube Live | 0.2% | 3.0% |
-
-## Limitations
-
-1. **Snapchat dominates revenue** (91.7%) — YouTube/Facebook insights drive content strategy decisions, while Snapchat revenue follows content volume
-2. **No production cost data** — can't compute true ROI per format
-3. **Cross-platform correlation ≠ causation** — A/B test needed for causal claims
-4. **Cohort data limited to 6-7 months** — true evergreen value is likely higher
+## Data Gaps to Fill
+- Promotion spend per video (true ROI of evergreen promotion)
+- SMM method labels (human vs automated)
+- Audience demographics (content × audience fit)
+- Production cost estimates (validate Shorts ROI with real costs)
 
 ---
 

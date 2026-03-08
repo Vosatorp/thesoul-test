@@ -8,7 +8,7 @@ Test assignment for Applied AI Engineer. Analysis of 11,500 videos across YouTub
 
 | File | Description |
 |------|-------------|
-| `thesoul_analysis_v2.ipynb` | Main analysis notebook (run end-to-end) |
+| `thesoul_analysis_v2.ipynb` | Main analysis notebook (runs end-to-end) |
 | `presentation.md` | Executive summary (English) |
 | `presentation_ru.md` | Executive summary (Russian) |
 | `data/` | 3 CSV datasets + description |
@@ -16,42 +16,36 @@ Test assignment for Applied AI Engineer. Analysis of 11,500 videos across YouTub
 ## Quick Start
 
 ```bash
-pip install -r requirements.txt
+pip install pandas numpy scipy scikit-learn matplotlib seaborn
 jupyter notebook thesoul_analysis_v2.ipynb
 ```
 
 ## Key Insights
 
-### 1. The Short-Form Monetization Trap
-YouTube Shorts have ~105% retention but 35× lower CPM than Production videos. Each Production video earns 7.6× more revenue despite looking worse on engagement dashboards. **Action:** reallocate 10% Shorts → Production 8–15 min (+$1,019).
+### 1. Shorts Are More Efficient Than They Look
+Shorts pay 35× less per view than Production videos — but produce 8.6× more revenue per hour of content created. Using duration as a production cost proxy, Shorts earn $167/hour vs $19/hour for Production. Longer Shorts (45-60s) earn 3.6× more than the dominant 15-30s format. Sunday publishing adds +159%. The 8-15 minute Production format remains the highest-ROI segment at 12.4× average efficiency.
 
 ### 2. Evergreen Content = Compound Returns
-8.5% of videos are "evergreen" but generate 54.5% of tracked revenue. 85% of their value comes after the first month. A multi-feature ML model (Gradient Boosting, 8 features, AUC = 0.93) identifies evergreen candidates within 7 days — catching 99% of evergreen with near-zero false positives.
+10.8% of videos keep growing after month 1 and generate 44.3% of tracked revenue. K-Means clustering reveals 3 content archetypes: Spike & Die (79%), Moderate Decay (12%), Evergreen (8.5%). A Gradient Boosting model (AUC = 0.87, cross-validated) flags evergreen candidates 7 days after publication.
 
-### 3. Cross-Platform Synergy
-Multi-platform content gets +36% views on Facebook and +31% on Snapchat (Mann-Whitney, p < 0.01). Only 4% of content is cross-posted — scaling to 20% yields +40M additional views.
+### 3. Cross-Platform Publishing Doubles Views
+Multi-platform content gets +100% views on Facebook and +134% on Snapchat (Mann-Whitney, p < 0.0001). Only 4% of content is cross-posted. Best combination: Facebook + Snapchat ($2,671 mean revenue per content piece).
 
 ### 4. Engagement Anti-Predicts Revenue
-Engagement rate is negatively correlated with revenue (r = −0.24). Only 13.4% of top-engagement videos are also top-revenue (worse than random). Watch time (r = +0.65) is the correct primary KPI.
+Engagement rate negatively correlates with revenue (Spearman ρ = -0.24) due to Simpson's paradox: Shorts dominate engagement metrics but have near-zero CPM. Watch time (ρ = +0.65) is the correct primary KPI. Within a single format, the paradox disappears.
 
 ### 5. Revenue Concentration Risk
-One Snapchat channel accounts for 46.4% of platform revenue (Gini = 0.73). Diversification and best-practice extraction recommended.
+One Snapchat channel = 46.4% of platform revenue (Gini = 0.73). Monitor and diversify.
 
 ## ML Model
 
 | Component | Detail |
 |-----------|--------|
 | Algorithm | Gradient Boosting (200 trees, max_depth=4) |
-| Features | 8 (view share 7d, watch time share 7d, duration, engagement rate, etc.) |
-| AUC (5-fold CV) | **0.93** |
-| Recall | 99% |
-| Business impact | Each missed evergreen ≈ $48.59 lost promotion value |
-
-## What's Next
-
-- **SMM hypothesis:** Does human SMM (thumbnails, titles) outperform auto-posting? Proposed: propensity score matching + A/B test
-- **Automation vision:** Notebook → production pipeline (data ingestion → ML scoring → anomaly detection → Slack alerts → AI agent insights)
-- **Further research:** causal inference for cross-platform, NLP on titles, audience overlap, seasonal CPM trends
+| Features | 8 (view share 7d, watch time share 7d, duration, engagement, CPM, etc.) |
+| AUC (5-fold CV) | **0.87** |
+| Top feature | Share of views in first 7 days (66.6% importance) |
+| Practical use | Flag evergreen candidates on day 7 → invest in promotion |
 
 ## Data
 
@@ -66,10 +60,11 @@ See `data/datasets_description.md` for full data dictionary.
 ## Methodology
 
 - **Revenue proxy:** `total_views × estimated_cpm / 1000`
-- **Evergreen classification:** month 3 views > 10% of month 0 views
+- **Evergreen definition:** >50% of total views arrive after month 0
 - **Cross-platform matching:** via `content_original_id` in dataset 3
-- **Statistical tests:** Mann-Whitney U (non-parametric), Spearman correlations
-- **ML model:** Gradient Boosting with 5-fold cross-validation
+- **Statistical tests:** Mann-Whitney U (non-parametric), Spearman rank correlations
+- **Clustering:** K-Means (k=3) on lifecycle retention features
+- **ML:** Gradient Boosting with stratified 5-fold cross-validation
 
 ---
 
