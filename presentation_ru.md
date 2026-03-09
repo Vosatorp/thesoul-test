@@ -14,24 +14,58 @@ paginate: true
 
 # Данные: что у нас есть
 
-**3 датасета**, реальные production-данные (ID анонимизированы):
+**3 датасета**, реальные production-данные (ID анонимизированы).
 
-### Dataset 1 — Video Performance (11 500 видео)
-Одна строка = одно видео. Основная таблица.
-- **Что за видео:** платформа (YouTube / Facebook / Snapchat), канал, формат (Short / Production / Live / Story), длительность
-- **Просмотры:** total, за первые 7 и 30 дней
-- **Watch time:** суммарное время просмотра (total, 7d, 30d)
-- **Вовлечённость:** лайки, дизлайки, комменты, шеры, engagement rate
-- **Монетизация:** показы рекламы (ad impressions), CPM (стоимость 1000 просмотров)
-- **Удержание:** средняя длительность просмотра, % досмотра
+---
 
-### Dataset 2 — Cohort Analysis (31 500 строк)
-Одна строка = одно видео × один месяц. Lifecycle видео: как набираются просмотры помесячно.
+# Dataset 1 — Video Performance (11 500 видео)
 
-### Dataset 3 — Cross-Platform (26 000 строк)
-Кросс-платформенные связки: один контент → несколько платформ. Позволяет оценить эффект кросс-постинга.
+Одна строка = одно видео. **22 колонки** — основная таблица:
+- **Идентификаторы:** video_id, channel_id, platform, video_type
+- **Просмотры:** total_views, first_7d_views, first_30d_views
+- **Watch time:** watch_time_minutes (+ 7d, 30d)
+- **Вовлечённость:** likes, dislikes, comments, shares, engagement_rate
+- **Монетизация:** ad_impressions, estimated_cpm
+- **Удержание:** avg_view_duration_seconds, avg_percentage_viewed
 
-**Расчётная выручка:** `views × CPM / 1000`
+| video_id | channel_id | platform | video_type | duration_s | total_views | watch_time_min | engage_rate | est_cpm |
+|:---------|:-----------|:---------|:-----------|---:|---:|---:|---:|---:|
+| vid_1129600 | channel_6357 | YouTube | Production | 260 | 2 | 1 | 0.00 | 0.00 |
+| vid_1129712 | channel_11257 | YouTube | Live | — | 618 | 1 341 | 2.10 | 2.51 |
+| vid_1127700 | channel_11257 | YouTube | Live | — | 5 569 | 31 616 | 0.34 | 3.54 |
+| vid_1127705 | channel_9356 | YouTube | Production | 247 | 2 | 0 | 0.00 | 0.00 |
+| vid_1131233 | channel_8327 | YouTube | Live | — | 202 | 255 | 0.00 | 0.00 |
+
+**Расчётная выручка:** `revenue ≈ total_views × estimated_cpm / 1000`
+
+---
+
+# Dataset 2 — Cohort Analysis (31 500 строк)
+
+Одна строка = одно видео × один календарный месяц. Lifecycle видео: как набираются просмотры помесячно.
+
+| video_id | platform | publish_month | data_month | months_since_publish | views | watch_time_min |
+|:---------|:---------|:--------------|:-----------|---:|---:|---:|
+| vid_1121116 | YouTube | 2025-09 | 2025-10 | 1 | 8 | 59 |
+| vid_1121116 | YouTube | 2025-09 | 2025-11 | 2 | 7 | 38 |
+| vid_1121116 | YouTube | 2025-09 | 2025-12 | 3 | 4 | 21 |
+| vid_1121116 | YouTube | 2025-09 | 2026-01 | 4 | 2 | 0 |
+| vid_1121116 | YouTube | 2025-09 | 2026-02 | 5 | 1 | 1 |
+
+↑ Видно как просмотры затухают по месяцам. Evergreen-видео — те, где этого затухания нет.
+
+---
+
+# Dataset 3 — Cross-Platform (26 000 строк)
+
+Кросс-платформенные связки: один контент (`content_original_id`) → несколько платформ.
+
+| video_id | content_original_id | platform | publish_date | total_views | watch_time_min |
+|:---------|:--------------------|:---------|:-------------|---:|---:|
+| vid_1126222 | vid_009759 | Snapchat | 2025-11-08 | 11 776 | 1 338 |
+| vid_1123721 | vid_009759 | Facebook | 2025-12-01 | 16 493 | 11 142 |
+
+↑ Один и тот же контент (vid_009759) залит на Snapchat и Facebook — можно сравнивать эффект кросс-постинга.
 
 ---
 
