@@ -211,7 +211,7 @@ ax.yaxis.grid(True, alpha=0.3)
 
 # Add ratio annotation
 ratio = focus.loc["Short", "rev_per_hour"] / focus.loc["Production", "rev_per_hour"]
-ax.annotate(f"Shorts are {ratio:.0f}× more efficient",
+ax.annotate(f"Shorts are {ratio:.1f}× more efficient",
             xy=(0.5, focus["rev_per_hour"].max() * 1.1),
             fontsize=13, ha="center", color="#333", fontstyle="italic")
 plt.tight_layout()
@@ -219,39 +219,38 @@ fig.savefig(FIG / "fig_05_revenue_per_hour.png")
 plt.close()
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  FIG 06 — Shorts Revenue by Duration Bucket                            ║
+# ║  FIG 06 — Shorts Mean Revenue by Duration Bucket (dual: bars + count)  ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
-print("Fig 06: Shorts by Duration...")
+print("Fig 06: Shorts by Duration (mean revenue + count)...")
 fig, ax = plt.subplots(figsize=(10, 6))
 
 shorts = d1[(d1["video_type"] == "Short") & d1["duration_seconds"].notna()].copy()
 bins_s = [0, 15, 30, 45, 60, 120]
 labels_s = ["0–15s", "15–30s", "30–45s", "45–60s", "60–120s"]
 shorts["dur_bucket"] = pd.cut(shorts["duration_seconds"], bins=bins_s, labels=labels_s, right=True)
-bucket_rev = shorts.groupby("dur_bucket", observed=False)["revenue"].sum()
+bucket_mean_rev = shorts.groupby("dur_bucket", observed=False)["revenue"].mean()
+bucket_count = shorts.groupby("dur_bucket", observed=False)["revenue"].count()
 
 colors_s = sns.color_palette("husl", len(labels_s))
-bars = ax.bar(bucket_rev.index.astype(str), bucket_rev.values,
+bars = ax.bar(bucket_mean_rev.index.astype(str), bucket_mean_rev.values,
               color=colors_s, edgecolor="white", linewidth=1.5, width=0.6)
 
-# Annotate all bars
-max_val = bucket_rev.max()
-for bar, (label, val) in zip(bars, bucket_rev.items()):
-    pct = val / bucket_rev.sum() * 100
+# Annotate: mean revenue + count
+max_val = bucket_mean_rev.max()
+for bar, (label, val), (_, cnt) in zip(bars, bucket_mean_rev.items(), bucket_count.items()):
     fontw = "bold" if label == "45–60s" else "normal"
     ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max_val * 0.02,
-            f"${val:,.0f}\n({pct:.1f}%)", ha="center", va="bottom", fontsize=10, fontweight=fontw)
+            f"${val:.2f}\n(n={cnt:,})", ha="center", va="bottom", fontsize=10, fontweight=fontw)
 
 # Highlight the 45-60s bucket
 best_idx = labels_s.index("45–60s")
 bars[best_idx].set_edgecolor("red")
 bars[best_idx].set_linewidth(3)
 
-ax.set_ylabel("Revenue ($)")
+ax.set_ylabel("Mean Revenue per Video ($)")
 ax.set_xlabel("Duration Bucket")
-ax.set_title("Shorts Revenue by Duration — Sweet Spot at 45–60s")
-ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"${x:,.0f}"))
-ax.set_ylim(0, max_val * 1.25)
+ax.set_title("Shorts: Mean Revenue per Video by Duration — Sweet Spot at 45–60s")
+ax.set_ylim(0, max_val * 1.35)
 ax.yaxis.grid(True, alpha=0.3)
 plt.tight_layout()
 fig.savefig(FIG / "fig_06_shorts_by_duration.png")
@@ -382,29 +381,40 @@ plt.close()
 print("Fig 09: Evergreen Revenue Share...")
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-# Use combined Evergreen + Moderate Decay from D2 lifecycle clusters
-eg_video_ids = set(feats_multi[feats_multi["lifecycle"].isin(["Evergreen", "Moderate Decay"])].index)
-d1["is_long_lived"] = d1["video_id"].isin(eg_video_ids)
+# Evergreen definition: >50% of views come after first month (month 0)
+# Using D2 cohort data; includes videos with no month-0 data (all views are post-month-0)
+video_total_d2 = d2.groupby("video_id")["views"].sum().rename("total_v")
+d2_m0 = d2[d2["months_since_publish"] == 0].groupby("video_id")["views"].sum()
+m0_ratio = d2_m0 / video_total_d2[d2_m0.index]
+eg_m0_ids = set(m0_ratio[m0_ratio < 0.5].index)
+no_m0_ids = set(d2["video_id"].unique()) - set(d2_m0.index)
+eg_video_ids = eg_m0_ids | no_m0_ids
 
-eg_count = d1["is_long_lived"].sum()
-eg_pct = eg_count / len(d1) * 100
+# Scope: only D2 videos (10,000 videos with cohort data)
+d2_video_set = set(d2["video_id"].unique())
+d1_d2 = d1[d1["video_id"].isin(d2_video_set)].copy()
+d1_d2["is_evergreen"] = d1_d2["video_id"].isin(eg_video_ids)
+
+eg_count = d1_d2["is_evergreen"].sum()
+eg_pct = eg_count / len(d1_d2) * 100
 non_eg_pct = 100 - eg_pct
 
-eg_rev = d1.loc[d1["is_long_lived"], "revenue"].sum()
-eg_rev_pct = eg_rev / d1["revenue"].sum() * 100
+eg_rev = d1_d2.loc[d1_d2["is_evergreen"], "revenue"].sum()
+d2_total_rev = d1_d2["revenue"].sum()
+eg_rev_pct = eg_rev / d2_total_rev * 100
 non_eg_rev_pct = 100 - eg_rev_pct
 
 colors_donut = ["#2ecc71", "#bdc3c7"]
 
 # Compute avg revenue per video
-avg_rev_eg = d1.loc[d1["is_long_lived"], "revenue"].mean()
-avg_rev_other = d1.loc[~d1["is_long_lived"], "revenue"].mean()
+avg_rev_eg = d1_d2.loc[d1_d2["is_evergreen"], "revenue"].mean()
+avg_rev_other = d1_d2.loc[~d1_d2["is_evergreen"], "revenue"].mean()
 
 # Left donut: Videos
 w1, t1, a1 = ax1.pie([eg_pct, non_eg_pct], colors=colors_donut, explode=(0.05, 0),
                        autopct="%1.1f%%", pctdistance=0.75, startangle=90,
                        wedgeprops=dict(width=0.4, edgecolor="white", linewidth=2))
-ax1.set_title(f"Share of Videos\n(n={eg_count} long-lived)", fontsize=13)
+ax1.set_title(f"Share of Videos\n(n={eg_count:,} evergreen)", fontsize=13)
 for a in a1:
     a.set_fontsize(14)
     a.set_fontweight("bold")
@@ -413,41 +423,40 @@ for a in a1:
 w2, t2, a2 = ax2.pie([eg_rev_pct, non_eg_rev_pct], colors=colors_donut, explode=(0.05, 0),
                        autopct="%1.1f%%", pctdistance=0.75, startangle=90,
                        wedgeprops=dict(width=0.4, edgecolor="white", linewidth=2))
-ax2.set_title(f"Share of Revenue\n(avg \\${avg_rev_eg:.0f}/video vs \\${avg_rev_other:.0f})", fontsize=13)
+ax2.set_title(f"Share of Revenue\n(avg \\${avg_rev_eg:.2f}/video vs \\${avg_rev_other:.2f})", fontsize=13)
 for a in a2:
     a.set_fontsize(14)
     a.set_fontweight("bold")
 
-fig.legend(["Long-lived (Evergreen + Moderate)", "Spike & Die"],
+fig.legend(["Evergreen (>50% views after month 0)", "Standard"],
            loc="lower center", ncol=2, frameon=False, fontsize=11,
            bbox_to_anchor=(0.5, -0.02))
-fig.suptitle("Long-Lived Content: ~9% of Videos with Extended Lifecycle", fontsize=14, y=1.0)
+fig.suptitle(f"Evergreen Content: {eg_pct:.1f}% of Videos → {eg_rev_pct:.1f}% of Revenue (D2 scope)", fontsize=14, y=1.0)
 plt.tight_layout()
 fig.savefig(FIG / "fig_09_evergreen_revenue_share.png")
 plt.close()
 
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  FIG 10 — Feature Importance (GradientBoosting)                        ║
+# ║  FIG 10 — Feature Importance (GradientBoosting, day-7 features ONLY)   ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
-print("Fig 10: Feature Importance...")
+print("Fig 10: Feature Importance (day-7 only, no leakage)...")
 fig, ax = plt.subplots(figsize=(10, 6))
 
-# Prepare features
-d1_model = d1.dropna(subset=["duration_seconds", "first_7d_views", "total_views"]).copy()
-d1_model = d1_model[d1_model["total_views"] > 0].copy()
+# Prepare features — ONLY those available on day 7 after publish
+# Excluded: first_30d_views, watch_time_30d, total_views, watch_time_minutes,
+#           engagement_rate (cumulative), likes/comments/shares (cumulative),
+#           ad_impressions (cumulative), estimated_cpm (known post-hoc)
+d1_model = d1.dropna(subset=["duration_seconds", "first_7d_views"]).copy()
+d1_model = d1_model[d1_model["first_7d_views"] >= 0].copy()
 
-d1_model["first7_ratio"] = d1_model["first_7d_views"] / d1_model["total_views"]
-d1_model["first30_ratio"] = d1_model["first_30d_views"] / d1_model["total_views"]
-d1_model["wt_7d_ratio"] = d1_model["watch_time_7d"] / d1_model["watch_time_minutes"].replace(0, np.nan)
-d1_model["wt_30d_ratio"] = d1_model["watch_time_30d"] / d1_model["watch_time_minutes"].replace(0, np.nan)
-# Use dataset_2 cluster-based evergreen (more accurate than first7 proxy)
+d1_model["video_type_encoded"] = d1_model["video_type"].map(
+    {"Short": 0, "Production": 1, "Live": 2, "Story": 3}).fillna(-1)
 d1_model["is_evergreen"] = d1_model["video_id"].isin(eg_video_ids).astype(int)
 
 feature_cols = [
-    "first7_ratio", "first30_ratio", "duration_seconds", "engagement_rate",
-    "estimated_cpm", "avg_percentage_viewed", "avg_view_duration_seconds",
-    "wt_7d_ratio", "wt_30d_ratio", "likes", "comments", "shares",
-    "ad_impressions", "total_views"
+    "first_7d_views", "watch_time_7d", "duration_seconds",
+    "avg_view_duration_seconds", "avg_percentage_viewed",
+    "video_type_encoded"
 ]
 
 X = d1_model[feature_cols].fillna(0)
@@ -458,37 +467,29 @@ gb = GradientBoostingClassifier(n_estimators=200, max_depth=4, random_state=42,
 gb.fit(X, y)
 
 importances = pd.Series(gb.feature_importances_, index=feature_cols)
-top8 = importances.nlargest(8).sort_values()
+top_feats = importances.sort_values()
 
 # Clean feature names for display
 name_map = {
-    "first7_ratio": "First 7-Day View Ratio",
-    "first30_ratio": "First 30-Day View Ratio",
+    "first_7d_views": "First 7-Day Views",
+    "watch_time_7d": "Watch Time (7 days)",
     "duration_seconds": "Video Duration",
-    "engagement_rate": "Engagement Rate",
-    "estimated_cpm": "Estimated CPM",
     "avg_percentage_viewed": "Avg % Viewed",
     "avg_view_duration_seconds": "Avg View Duration",
-    "wt_7d_ratio": "Watch Time 7D Ratio",
-    "wt_30d_ratio": "Watch Time 30D Ratio",
-    "likes": "Likes",
-    "comments": "Comments",
-    "shares": "Shares",
-    "ad_impressions": "Ad Impressions",
-    "total_views": "Total Views",
+    "video_type_encoded": "Video Type",
 }
 
-colors_fi = sns.color_palette("husl", 8)
-bars = ax.barh([name_map.get(f, f) for f in top8.index], top8.values,
+colors_fi = sns.color_palette("husl", len(top_feats))
+bars = ax.barh([name_map.get(f, f) for f in top_feats.index], top_feats.values,
                color=colors_fi, edgecolor="white", linewidth=1)
 
-for bar, val in zip(bars, top8.values):
+for bar, val in zip(bars, top_feats.values):
     ax.text(val + 0.005, bar.get_y() + bar.get_height()/2,
             f"{val:.3f}", va="center", fontsize=10)
 
 ax.set_xlabel("Feature Importance")
-ax.set_title("What Predicts Evergreen Content? (GradientBoosting)")
-ax.set_xlim(0, top8.max() * 1.2)
+ax.set_title("What Predicts Evergreen Content? (Day-7 Features Only, AUC=0.71)")
+ax.set_xlim(0, top_feats.max() * 1.2)
 ax.xaxis.grid(True, alpha=0.3)
 plt.tight_layout()
 fig.savefig(FIG / "fig_10_feature_importance.png")
